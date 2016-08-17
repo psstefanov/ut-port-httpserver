@@ -52,6 +52,9 @@ function HttpServerPort() {
             info: {
                 version: packageJson.version
             },
+            basePath: '/rpc',
+            derefJSONSchema: true,
+            jsonEditor: true,
             pathPrefixSize: 2 // this helps extracting the namespace from the second argument of the url
         },
         jwt: {

@@ -280,21 +280,44 @@ module.exports = function(port) {
                                 id: joi.string(),
                                 method: joi.string().valid(validation.method),
                                 params: validation.schema.params.label('params')
-                            })
+                            }).label('params_' + validation.method)
                         },
-                        response: {
-                            schema: joi.object({
-                                jsonrpc: joi.string().valid('2.0'),
-                                id: joi.string(),
-                                result: validation.schema.result.label('result'),
-                                error: joi.object({
-                                    'code': joi.string().description('Error code'),
-                                    'message': joi.string().description('Debug error message'),
-                                    'errorPrint': joi.string().optional().description('User friendly error message'),
-                                    'type': joi.string().description('Error type')
-                                }).label('error'),
-                                debug: joi.object().label('debug').optional()
-                            }).requiredKeys('jsonrpc', 'id').xor('result', 'error')
+                        plugins: {
+                            'hapi-swagger': {
+                                id: (validation.schema.id || validation.method),
+                                responses: {
+                                    200: {
+                                        description: 'Success',
+                                        schema: joi.object({
+                                            'jsonrpc': joi.string().valid('2.0'),
+                                            'id': joi.string(),
+                                            'result': validation.schema.result.label('result')
+                                        }).requiredKeys('jsonrpc', 'id', 'result').label(validation.method)
+                                    },
+                                    default: {
+                                        'description': 'JSON-RPC compatible response object for error',
+                                        'schema': joi.object({
+                                            'jsonrpc': joi.string().valid('2.0'),
+                                            'id': joi.string(),
+                                            'error': joi.object({
+                                                'code': joi.string().description('Standard code as defined by JSON-RPC. These codes usually are not application errors, but more on protocol or network level.'),
+                                                'message': joi.string().description('Technical error message suitable to be logged in application logs. This message is supposed to aid for audit / debug purposes and is visible to system admins'),
+                                                'errorPrint': joi.string().description('User friendly message translated to the user\'s language and suitable for displaying to the user that invoked the action'),
+                                                'type': joi.string().description('Application defined error type, usually part of well defined list of error types. The error types should be namespaced similar to the services. The calling app should be able to interpret these types and in some cases provide suitable options for the user to proceed accordingly to the error. For example errors such duplication of data, expired passwords and similar, are usually things that the calling front end could handle.')
+                                            }).description('Presence of this property indicates an error'),
+                                            'debug': joi.object({
+                                                'properties': joi.object({
+                                                    'stackInfo': joi.array().items(joi.string())
+                                                }).description('Provides the calling stack, which should include also the filename and row:column as per browser standard'),
+                                                'cause': joi.object().description('Any nested errors should be in this property. The nested errors could have their own cause and stackinfo')
+                                            }).label('debug').description('This whole object is included only in non production environment, to aid integration and testing efforts. There could be many properties in the debug object, that give further details, but main idea here is to stick to at least the specified properties as minimum standard.')
+                                        }).requiredKeys('jsonrpc', 'id', 'error').label('ErrorResponse')
+                                    }
+                                }
+                            },
+                            validate: {
+                                params: validation.schema.params.label('params')
+                            }
                         }
                     },
                     handler: function(req, repl) {
